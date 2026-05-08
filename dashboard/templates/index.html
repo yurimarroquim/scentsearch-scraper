@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - ScentSearch Scraper{% endblock %}
+{% block content %}
+<h2 style="margin-bottom: 1.5rem; font-size: 1.5rem;">Dashboard</h2>
+
+<div class="grid-4" style="margin-bottom: 1.5rem;">
+    <div class="card stat">
+        <div class="stat-value">{{ stats.total_products }}</div>
+        <div class="stat-label">Produtos Cadastrados</div>
+    </div>
+    <div class="card stat">
+        <div class="stat-value">{{ stats.prices_today }}</div>
+        <div class="stat-label">Preços Coletados Hoje</div>
+    </div>
+    <div class="card stat">
+        <div class="stat-value">{{ stats.active_stores }}</div>
+        <div class="stat-label">Lojas Ativas</div>
+    </div>
+    <div class="card stat">
+        <div class="stat-value">{{ stats.total_logs }}</div>
+        <div class="stat-label">Execuções Totais</div>
+    </div>
+</div>
+
+<div class="actions">
+    <form method="POST" action="/scrape/all" style="display:inline;">
+        <button class="btn btn-primary" type="submit">&#9654; Executar Todas as Lojas</button>
+    </form>
+    <a href="/logs" class="btn btn-secondary">&#128196; Ver Logs</a>
+    <a href="/products" class="btn btn-secondary">&#128722; Ver Produtos</a>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-title">Últimas Execuções por Loja</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Loja</th>
+                    <th>Produtos</th>
+                    <th>Status</th>
+                    <th>Data</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in last_runs %}
+                <tr>
+                    <td>{{ log.store_name }}</td>
+                    <td>{{ log.products_found }}</td>
+                    <td>
+                        <span class="badge badge-{{ log.status }}">{{ log.status }}</span>
+                    </td>
+                    <td style="color: #64748b; font-size: 0.8rem;">
+                        {% if log.started_at %}
+                            {{ log.started_at.strftime('%d/%m %H:%M') }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" style="text-align:center; color: #64748b;">Nenhuma execução ainda</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Agendamento</div>
+        {% for job in jobs %}
+        <div style="margin-bottom: 1rem; padding: 1rem; background: #0f0f1a; border-radius: 8px;">
+            <div style="font-weight: 600; margin-bottom: 0.5rem;">{{ job.name }}</div>
+            <div style="color: #64748b; font-size: 0.85rem;">Próxima execução:</div>
+            <div style="color: #60a5fa; font-size: 0.9rem; margin-top: 0.25rem;">
+                {% if job.next_run %}
+                    {{ job.next_run }}
+                {% else %}
+                    Não agendado
+                {% endif %}
+            </div>
+            <div style="color: #64748b; font-size: 0.8rem; margin-top: 0.5rem;">{{ job.trigger }}</div>
+        </div>
+        {% else %}
+        <p style="color: #64748b;">Nenhum job agendado</p>
+        {% endfor %}
+
+        <form method="POST" action="/scrape/all" style="margin-top: 1rem;">
+            <button class="btn btn-primary" type="submit" style="width: 100%;">&#9654; Executar Agora</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

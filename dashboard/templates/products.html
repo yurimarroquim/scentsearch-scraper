@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Produtos - ScentSearch Scraper{% endblock %}
+{% block content %}
+<h2 style="margin-bottom: 1.5rem; font-size: 1.5rem;">Produtos</h2>
+
+<div class="card" style="margin-bottom: 1rem;">
+    <form method="GET" action="/products" style="display: flex; gap: 1rem; align-items: center;">
+        <input
+            type="text"
+            name="q"
+            value="{{ query or '' }}"
+            placeholder="Buscar produto..."
+            style="flex: 1; background: #0f0f1a; border: 1px solid #2d3748; border-radius: 8px; padding: 0.6rem 1rem; color: #e2e8f0; font-size: 0.9rem;"
+        >
+        <button class="btn btn-primary" type="submit">&#128269; Buscar</button>
+        {% if query %}<a href="/products" class="btn btn-secondary">&#10005; Limpar</a>{% endif %}
+    </form>
+</div>
+
+<div class="card">
+    <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 1rem;">
+        {{ products|length }} produto(s) encontrado(s)
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Produto</th>
+                <th>Loja</th>
+                <th>Marca</th>
+                <th>Volume</th>
+                <th>Último Preço</th>
+                <th>Desconto</th>
+                <th>Link</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in products %}
+            <tr>
+                <td style="max-width: 300px;">
+                    <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        {{ item.product.name[:60] }}{% if item.product.name|length > 60 %}...{% endif %}
+                    </div>
+                </td>
+                <td style="color: #94a3b8; white-space: nowrap;">{{ item.store_name }}</td>
+                <td style="color: #94a3b8;">{{ item.product.brand or '-' }}</td>
+                <td style="color: #94a3b8; white-space: nowrap;">
+                    {% if item.product.volume_ml %}{{ item.product.volume_ml }}ml{% else %}-{% endif %}
+                </td>
+                <td>
+                    {% if item.latest_price %}
+                        <span class="price">R$ {{ "%.2f"|format(item.latest_price.price)|replace('.', ',') }}</span>
+                    {% else %}
+                        <span style="color: #64748b;">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.latest_price and item.latest_price.discount_percent %}
+                        <span class="discount">-{{ "%.0f"|format(item.latest_price.discount_percent) }}%</span>
+                    {% else %}-{% endif %}
+                </td>
+                <td>
+                    <a href="{{ item.product.url }}" target="_blank" style="color: #60a5fa; font-size: 0.8rem;">
+                        Ver &#8594;
+                    </a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" style="text-align: center; color: #64748b; padding: 2rem;">
+                    Nenhum produto encontrado. Execute um scrape para coletar dados.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total > 50 %}
+<div style="text-align: center; margin-top: 1rem;">
+    <a href="/products?offset={{ offset + 50 }}&q={{ query or '' }}" class="btn btn-secondary">
+        Próxima página &#8594;
+    </a>
+</div>
+{% endif %}
+{% endblock %}

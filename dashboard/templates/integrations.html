@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Integrações - ScentSearch Scraper{% endblock %}
+{% block content %}
+<h2 style="margin-bottom: 1.5rem; font-size: 1.5rem;">Integrações de API</h2>
+
+{% if message %}
+<div class="alert alert-{{ message_type }}">{{ message }}</div>
+{% endif %}
+
+<!-- ── Mercado Livre ──────────────────────────────────────────────────────── -->
+<div class="card" style="margin-bottom: 2rem;">
+    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
+        <div style="width:48px;height:48px;background:linear-gradient(135deg,#ffe600,#f5a623);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🛒</div>
+        <div>
+            <div style="font-size:1.2rem;font-weight:700;">Mercado Livre</div>
+            <div style="color:#64748b;font-size:0.85rem;">API oficial de marketplace · OAuth 2.0</div>
+        </div>
+        <div style="margin-left:auto;">
+            {% if ml_status.status == 'authorized' %}
+                <span class="badge badge-success">✓ Autorizado</span>
+            {% elif ml_status.status == 'not_configured' %}
+                <span class="badge badge-error">Sem credenciais</span>
+            {% elif ml_status.status == 'expired' %}
+                <span class="badge badge-partial">Token expirado</span>
+            {% else %}
+                <span class="badge badge-partial">Aguardando autorização</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if ml_status.status == 'authorized' %}
+    <!-- ── Autorizado ── -->
+    <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:10px;padding:1.25rem;margin-bottom:1.25rem;">
+        <div style="font-weight:600;color:#4ade80;margin-bottom:0.4rem;">✓ Conexão ativa</div>
+        <div style="font-size:0.85rem;color:#94a3b8;">
+            {{ ml_status.label }}<br>
+            Token expira em <strong style="color:#60a5fa;">{{ ml_status.expires_in_minutes }} min</strong>
+            {% if ml_status.has_refresh %} · renovação automática ativa{% endif %}
+        </div>
+    </div>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+        <a href="/mercadolivre/authorize" class="btn btn-secondary">🔄 Reautorizar</a>
+        <form action="/mercadolivre/revoke" method="post" style="display:inline;">
+            <button type="submit" class="btn" style="background:#7f1d1d;color:#fca5a5;">🗑 Revogar token</button>
+        </form>
+    </div>
+
+    {% elif ml_status.status == 'not_configured' %}
+    <!-- ── Sem credenciais ── -->
+    <div style="padding:1rem;background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.2);border-radius:8px;">
+        <div style="font-weight:600;margin-bottom:0.5rem;color:#a78bfa;">Como configurar:</div>
+        <ol style="padding-left:1.5rem;color:#94a3b8;font-size:0.85rem;line-height:1.8;">
+            <li>Acesse <a href="https://developers.mercadolivre.com.br" target="_blank" style="color:#60a5fa;">developers.mercadolivre.com.br</a></li>
+            <li>Crie um app e adicione o Redirect URI: <code style="color:#fbbf24;">https://scentsearch.com.br</code></li>
+            <li>Copie o Client ID e Client Secret para o arquivo <code>.env</code></li>
+            <li>Reinicie o sistema e volte aqui</li>
+        </ol>
+    </div>
+
+    {% else %}
+    <!-- ── Aguardando autorização / expirado ── -->
+    <div style="background:rgba(59,130,246,0.05);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:1.5rem;margin-bottom:1.5rem;">
+        <div style="font-weight:700;font-size:1rem;margin-bottom:1.25rem;color:#60a5fa;">Como autorizar (sem precisar do portal de devs)</div>
+
+        <!-- Passo 1 -->
+        <div style="display:flex;gap:1rem;margin-bottom:1rem;align-items:flex-start;">
+            <div style="min-width:28px;height:28px;background:#2563eb;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;">1</div>
+            <div>
+                <div style="font-weight:600;margin-bottom:0.3rem;">Clique no link abaixo para aprovar o app na sua conta Mercado Livre</div>
+                <a href="{{ ml_auth_url }}" target="_blank" class="btn btn-primary" style="margin-top:0.5rem;">
+                    🔑 Abrir página de autorização do ML
+                </a>
+                <div style="margin-top:0.5rem;font-size:0.8rem;color:#64748b;">Abre o site do Mercado Livre — faça login se necessário e clique em <strong style="color:#e2e8f0;">Permitir</strong>.</div>
+            </div>
+        </div>
+
+        <!-- Passo 2 -->
+        <div style="display:flex;gap:1rem;margin-bottom:1rem;align-items:flex-start;">
+            <div style="min-width:28px;height:28px;background:#2563eb;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;">2</div>
+            <div>
+                <div style="font-weight:600;margin-bottom:0.3rem;">Após aprovar, o ML te redireciona — a página pode dar erro</div>
+                <div style="font-size:0.85rem;color:#94a3b8;">
+                    Normal! O redirecionamento vai para <code style="color:#fbbf24;">scentsearch.com.br</code> que pode mostrar um erro, mas o URL do seu browser vai conter um <strong style="color:#e2e8f0;">código</strong> como:
+                </div>
+                <div style="margin-top:0.5rem;background:#0f0f1a;border:1px dashed #374151;border-radius:6px;padding:0.6rem 1rem;font-family:monospace;font-size:0.8rem;color:#a78bfa;word-break:break-all;">
+                    https://scentsearch.com.br<strong style="color:#4ade80;">?code=TG-xxxxxxxxxxxxxxx-...</strong>&state=...
+                </div>
+            </div>
+        </div>
+
+        <!-- Passo 3 -->
+        <div style="display:flex;gap:1rem;align-items:flex-start;">
+            <div style="min-width:28px;height:28px;background:#2563eb;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;">3</div>
+            <div style="width:100%;">
+                <div style="font-weight:600;margin-bottom:0.5rem;">Copie o valor do parâmetro <code>code=</code> e cole abaixo</div>
+                <form action="/mercadolivre/exchange" method="post" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
+                    <input
+                        name="code"
+                        type="text"
+                        placeholder="TG-xxxxxxxxxxxxxxx-xxxxxxxxx"
+                        required
+                        style="flex:1;min-width:280px;padding:0.6rem 1rem;background:#0f0f1a;border:1px solid #374151;border-radius:8px;color:#e2e8f0;font-family:monospace;font-size:0.9rem;"
+                    />
+                    <button type="submit" class="btn btn-primary">✓ Confirmar código</button>
+                </form>
+                <div style="margin-top:0.5rem;font-size:0.78rem;color:#64748b;">
+                    Copie apenas o valor após <code>code=</code> e antes do próximo <code>&amp;</code>.
+                    Exemplo: <code style="color:#a78bfa;">TG-abc123def456</code>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── Amazon Brasil ─────────────────────────────────────────────────────── -->
+<div class="card">
+    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
+        <div style="width:48px;height:48px;background:linear-gradient(135deg,#FF9900,#FF6600);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;">📦</div>
+        <div>
+            <div style="font-size:1.2rem;font-weight:700;">Amazon Brasil</div>
+            <div style="color:#64748b;font-size:0.85rem;">Product Advertising API 5 (PA-API)</div>
+        </div>
+        <div style="margin-left:auto;">
+            {% if amazon_configured %}
+                <span class="badge badge-success">✓ Configurado</span>
+            {% else %}
+                <span class="badge badge-error">Sem credenciais</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+        <div>
+            <div style="color:#94a3b8;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">Variáveis necessárias</div>
+            <div style="font-size:0.85rem;line-height:2.2;">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <code>AMAZON_ACCESS_KEY</code>
+                    {% if amazon_access_key %}<span class="badge badge-success">✓</span>{% else %}<span class="badge badge-error">Faltando</span>{% endif %}
+                </div>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <code>AMAZON_SECRET_KEY</code>
+                    {% if amazon_secret_key %}<span class="badge badge-success">✓</span>{% else %}<span class="badge badge-error">Faltando</span>{% endif %}
+                </div>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <code>AMAZON_PARTNER_TAG</code>
+                    {% if amazon_partner_tag %}<span class="badge badge-success">✓</span>{% else %}<span class="badge badge-error">Faltando</span>{% endif %}
+                </div>
+            </div>
+        </div>
+        <div>
+            <div style="color:#94a3b8;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">Como obter</div>
+            <ol style="padding-left:1.5rem;color:#94a3b8;font-size:0.8rem;line-height:1.8;">
+                <li>Cadastre no <a href="https://programas.amazon.com.br/associates" target="_blank" style="color:#60a5fa;">Amazon Associates BR</a></li>
+                <li>Gere as chaves em <a href="https://affiliate-program.amazon.com/assoc_credentials/home" target="_blank" style="color:#60a5fa;">assoc_credentials</a></li>
+                <li>Seu Partner Tag é o seu ID de afiliado (ex: <code style="color:#fbbf24;">seutag-20</code>)</li>
+                <li>Adicione as 3 variáveis no arquivo <code>.env</code> e reinicie</li>
+            </ol>
+        </div>
+    </div>
+</div>
+{% endblock %}

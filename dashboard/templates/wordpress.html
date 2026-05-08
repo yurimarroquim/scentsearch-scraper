@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}WordPress - ScentSearch Scraper{% endblock %}
+{% block content %}
+<h2 style="margin-bottom: 1.5rem; font-size: 1.5rem;">Integração WordPress</h2>
+
+{% if message %}
+<div class="alert alert-{{ message_type }}">{{ message }}</div>
+{% endif %}
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-title">Status da Conexão</div>
+        {% if wp_configured %}
+            {% if wp_connected %}
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div style="width: 12px; height: 12px; border-radius: 50%; background: #4ade80;"></div>
+                    <span style="color: #4ade80; font-weight: 600;">Conectado</span>
+                </div>
+                <p style="color: #94a3b8; font-size: 0.9rem;">WordPress configurado e autenticado com sucesso.</p>
+            {% else %}
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div style="width: 12px; height: 12px; border-radius: 50%; background: #f87171;"></div>
+                    <span style="color: #f87171; font-weight: 600;">Erro de Conexão</span>
+                </div>
+                <p style="color: #94a3b8; font-size: 0.9rem;">Verifique as credenciais no arquivo .env</p>
+            {% endif %}
+        {% else %}
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
+                <div style="width: 12px; height: 12px; border-radius: 50%; background: #fbbf24;"></div>
+                <span style="color: #fbbf24; font-weight: 600;">Não Configurado</span>
+            </div>
+            <p style="color: #94a3b8; font-size: 0.9rem;">Configure as variáveis <code>WP_URL</code>, <code>WP_USERNAME</code> e <code>WP_APP_PASSWORD</code> no arquivo <code>.env</code></p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-title">Sincronização</div>
+        {% if wp_connected %}
+            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 1rem;">
+                Sincronize os produtos coletados com seu WordPress automaticamente.
+            </p>
+            <form method="POST" action="/wordpress/sync">
+                <button class="btn btn-primary" type="submit" style="width: 100%;">
+                    &#8635; Sincronizar com WordPress
+                </button>
+            </form>
+        {% else %}
+            <p style="color: #64748b; font-size: 0.9rem;">
+                Configure o WordPress para habilitar a sincronização.
+            </p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">Como Configurar</div>
+    <ol style="color: #94a3b8; font-size: 0.9rem; line-height: 1.8; padding-left: 1.5rem;">
+        <li>No seu WordPress, vá em <strong>Usuários → Seu Perfil</strong></li>
+        <li>Role para baixo até <strong>Senhas de Aplicativos</strong></li>
+        <li>Crie uma nova senha de aplicativo com o nome <code>ScentSearch</code></li>
+        <li>Copie a senha gerada</li>
+        <li>Edite o arquivo <code>.env</code> com as seguintes variáveis:</li>
+    </ol>
+    <pre style="background: #0f0f1a; border: 1px solid #2d3748; border-radius: 8px; padding: 1rem; margin-top: 1rem; font-size: 0.85rem; color: #4ade80; overflow-x: auto;">WP_URL=https://seu-site.com
+WP_USERNAME=seu_usuario
+WP_APP_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx</pre>
+</div>
+{% endblock %}

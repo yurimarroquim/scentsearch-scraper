@@ -1,0 +1,13 @@
+kind = "web"
+previewPath = "/"
+title = "ScentSearch Scraper"
+version = "1.0.0"
+
+[[services]]
+localPort = 8000
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "cd artifacts/scentsearch-scraper && PORT=8000 python main.py"
+waitForPort = 8000

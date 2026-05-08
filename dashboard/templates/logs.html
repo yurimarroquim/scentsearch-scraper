@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Logs - ScentSearch Scraper{% endblock %}
+{% block content %}
+<h2 style="margin-bottom: 1.5rem; font-size: 1.5rem;">Logs de Execução</h2>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Loja</th>
+                <th>Início</th>
+                <th>Duração</th>
+                <th>Produtos</th>
+                <th>Preços</th>
+                <th>Erros</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td style="font-weight: 500;">{{ log.store_name or 'Todas' }}</td>
+                <td style="color: #94a3b8; font-size: 0.85rem; white-space: nowrap;">
+                    {% if log.started_at %}{{ log.started_at.strftime('%d/%m/%Y %H:%M:%S') }}{% endif %}
+                </td>
+                <td style="color: #94a3b8; font-size: 0.85rem;">
+                    {% if log.finished_at and log.started_at %}
+                        {{ ((log.finished_at - log.started_at).total_seconds()|int) }}s
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ log.products_found }}</td>
+                <td>{{ log.prices_updated }}</td>
+                <td>
+                    {% if log.errors > 0 %}
+                        <span style="color: #f87171;">{{ log.errors }}</span>
+                    {% else %}
+                        <span style="color: #4ade80;">0</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge badge-{{ log.status }}">{{ log.status }}</span>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" style="text-align: center; color: #64748b; padding: 2rem;">
+                    Nenhum log encontrado. Execute um scrape para gerar logs.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
