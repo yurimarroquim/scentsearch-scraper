@@ -25,6 +25,9 @@ from scrapers.sgimportados import SgImportadosScraper
 from scrapers.decantslondrina import DecantsLondrinaScraper
 from scrapers.beautybox import BeautyboxScraper
 from scrapers.neeche import NeecheScraper
+from scrapers.ofertasna import OfertasNaScraper
+from scrapers.guidodecants import GuidoDecantsScraper
+from scrapers.giraofertas import GiraoFertasScraper
 from database.db import get_db
 from database.models import ScrapingLog
 from database.repository import (
@@ -55,6 +58,9 @@ SCRAPER_REGISTRY = {
     "beautybox": BeautyboxScraper,
     "anmy": AnmyScraper,
     "neeche": NeecheScraper,
+    "ofertasna": OfertasNaScraper,
+    "guidodecants": GuidoDecantsScraper,
+    "giraofertas": GiraoFertasScraper,
 }
 
 
