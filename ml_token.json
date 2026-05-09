@@ -1,8 +1,0 @@
-{
-  "access_token": "APP_USR-6684864519277208-041222-c407c0be28a368cd46d13ca6f9964b18-260752024",
-  "token_type": "Bearer",
-  "expires_in": 21600,
-  "scope": "read urn:global:admin:info:/read-only urn:global:admin:info:/read-write urn:global:admin:oauth:/read-only urn:global:admin:oauth:/read-write urn:global:admin:users:/read-only urn:ml:all:comunication:/read-only urn:ml:mktp:comunication:/read-only write",
-  "user_id": 260752024,
-  "saved_at": 1776047002
-}
