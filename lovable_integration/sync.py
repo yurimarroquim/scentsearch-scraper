@@ -103,43 +103,90 @@ class LovableSyncService:
 
         return {"status": "synced"}
 
-    def sync_all_products(self, limit: int = 500) -> dict:
-        if not self.is_available():
-            logger.warning("Lovable sync ignorado: API key não configurada")
-            return {"synced": 0, "errors": 0, "skipped": "not_configured"}
+def sync_all_products(self, limit: int = 500) -> dict:
+    if not self.is_available():
+        logger.warning("Lovable sync ignorado: API key não configurada")
+        return {"synced": 0, "errors": 0, "skipped": "not_configured"}
 
-        synced = 0
-        errors = 0
+    tasks = []
+    with get_db() as db:
+        from sqlalchemy.orm import joinedload
+        products = (
+            db.query(Product)
+            .options(joinedload(Product.store))
+            .join(Price)
+            .filter(Product.store.has())
+            .limit(limit)
+            .all()
+        )
+        price_repo = PriceRepository(db)
+        for product in products:
+            latest_price = price_repo.get_latest(product.id)
+            if latest_price:
+                tasks.append((
+                    product.name,
+                    product.brand,
+                    product.image_url,
+                    product.url,
+                    product.store.slug,
+                    product.store.name,
+                    float(latest_price.price),
+                ))
 
-        with get_db() as db:
-            from sqlalchemy.orm import joinedload
-            products = (
-                db.query(Product)
-                .options(joinedload(Product.store))
-                .join(Price)
-                .filter(Product.store.has())
-                .limit(limit)
-                .all()
-            )
+    if not tasks:
+        logger.info("Nenhum produto para sincronizar")
+        return {"synced": 0, "errors": 0}
 
-            for i, product in enumerate(products):
-                try:
-                    price_repo = PriceRepository(db)
-                    latest_price = price_repo.get_latest(product.id)
-                    result = self.sync_product(product, product.store, latest_price)
+    logger.info(f"Sincronizando {len(tasks)} produtos em paralelo...")
 
-                    if result["status"] == "synced":
-                        synced += 1
-                    elif result["status"] == "error":
-                        errors += 1
-                except Exception as e:
-                    logger.error(f"Erro ao sincronizar {product.name}: {e}")
+    def _sync_task(task):
+        name, brand, image_url, url, store_slug, store_name, price = task
+        slug = self._generate_slug(name)
+        tipo = "decant" if store_slug in DECANT_STORE_SLUGS else "perfume"
+        perfume_payload = {
+            "nome": name,
+            "marca": brand or "Sem marca",
+            "imagem_url": image_url or "https://placehold.co/400x400?text=Perfume",
+            "slug": slug,
+            "tipo": tipo,
+        }
+        try:
+            r = _post_with_retry(f"{self.base_url}/api/ingest/perfumes", perfume_payload, self.headers)
+            if r.status_code not in (200, 201):
+                return "error"
+        except Exception:
+            return "error"
+        preco_payload = {
+            "perfume_slug": slug,
+            "loja": store_name,
+            "preco": price,
+            "link_afiliado": make_deeplink(store_slug, url),
+            "disponivel": True,
+        }
+        try:
+            r = _post_with_retry(f"{self.base_url}/api/ingest/precos", preco_payload, self.headers)
+            if r.status_code not in (200, 201):
+                return "error"
+        except Exception:
+            return "error"
+        return "synced"
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    synced = 0
+    errors = 0
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        futures = [executor.submit(_sync_task, task) for task in tasks]
+        for future in as_completed(futures):
+            try:
+                if future.result() == "synced":
+                    synced += 1
+                else:
                     errors += 1
+            except Exception:
+                errors += 1
 
-                time.sleep(0.1)
-
-        logger.info(f"Lovable sync completo: {synced} sincronizados, {errors} erros")
-        return {"synced": synced, "errors": errors}
+    logger.info(f"Lovable sync completo: {synced} sincronizados, {errors} erros")
+    return {"synced": synced, "errors": errors}
 
     def _generate_slug(self, name: str) -> str:
         slug = name.lower()
