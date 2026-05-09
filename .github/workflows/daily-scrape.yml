@@ -9,7 +9,7 @@ jobs:
   scrape:
     name: ${{ matrix.store }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes:90
     strategy:
       fail-fast: false
       matrix:
@@ -50,4 +50,5 @@ jobs:
           STORE_SLUG: ${{ matrix.store }}
           LOVABLE_API_URL: ${{ secrets.LOVABLE_API_URL }}
           LOVABLE_API_KEY: ${{ secrets.LOVABLE_API_KEY }}
-        run: python gha_run_store.py
+        run: python -u gha_run_store.py
+
