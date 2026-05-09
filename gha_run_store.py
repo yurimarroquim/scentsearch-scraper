@@ -1,4 +1,10 @@
-import os, sys
+import os, sys, logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    stream=sys.stdout,
+)
 
 store_slug = os.environ.get('STORE_SLUG')
 if not store_slug:
