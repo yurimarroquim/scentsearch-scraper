@@ -16,12 +16,7 @@ run_store_scraping(store_slug)
 
 from lovable_integration.sync import LovableSyncService
 svc = LovableSyncService()
-total = 0
-while True:
-    result = svc.sync_all_products(limit=500)
-    synced = result.get('synced', 0) if isinstance(result, dict) else 0
-    total += synced
-    if synced == 0:
-        break
+result = svc.sync_all_products(limit=99999)
+total = result.get('synced', 0) if isinstance(result, dict) else 0
 
 print(f"Concluído: {store_slug} — {total} produtos sincronizados")
