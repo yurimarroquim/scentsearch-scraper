@@ -110,6 +110,7 @@ class ScrapingManager:
                 store = StoreModel(
                     slug=store_slug,
                     name=scraper_class.store_name,
+                    url=scraper_class.base_url,
                 )
                 db.add(store)
                 db.commit()
