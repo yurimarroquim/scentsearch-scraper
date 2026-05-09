@@ -1,16 +1,12 @@
-import requests
 import re
-from bs4 import BeautifulSoup
 from scrapers.base import BaseScraper, PriceData, ScrapingResult
 import logging
 
 logger = logging.getLogger(__name__)
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "text/html",
-    "Accept-Language": "pt-BR,pt;q=0.9",
-}
+CATEGORY_URLS = [
+    "https://www.thekingofparfums.com.br/br/produtos/",
+]
 
 
 class KingOfParfumsScraper(BaseScraper):
@@ -22,30 +18,27 @@ class KingOfParfumsScraper(BaseScraper):
         text = text.strip().replace("R$", "").replace(".", "").replace(",", ".").strip()
         try:
             return float(text)
-        except:
+        except Exception:
             return None
 
     def scrape(self):
         products = []
         errors = []
         seen_ids = set()
-        page = 1
 
-        while True:
-            try:
-                url = f"{self.base_url}/br/produtos/page/{page}/"
-                resp = requests.get(url, headers=HEADERS, timeout=(5, 30))
-
-                if resp.status_code == 404:
+        for cat_url in CATEGORY_URLS:
+            page = 1
+            while True:
+                url = cat_url if page == 1 else f"{cat_url}?page={page}"
+                soup = self.get_page(url)
+                if not soup:
                     break
-                resp.raise_for_status()
 
-                soup = BeautifulSoup(resp.text, "html.parser")
                 items = soup.select(".js-item-product")
-
                 if not items:
                     break
 
+                new_count = 0
                 for item in items:
                     try:
                         pid = item.get("data-product-id")
@@ -71,9 +64,10 @@ class KingOfParfumsScraper(BaseScraper):
                         if not product_url.startswith("http"):
                             product_url = self.base_url + product_url
 
-                        price_el = item.select_one(".js-price-display")
-                        if not price_el:
-                            price_el = item.select_one(".item-price")
+                        price_el = (
+                            item.select_one(".js-price-display")
+                            or item.select_one(".item-price")
+                        )
                         if not price_el:
                             continue
                         price = self.parse_price(price_el.get_text(strip=True))
@@ -95,9 +89,8 @@ class KingOfParfumsScraper(BaseScraper):
 
                         tipo = (
                             "decant"
-                            if "decant" in product_url.lower()
-                            or "decant" in name.lower()
-                            else "frasco"
+                            if "decant" in product_url.lower() or "decant" in name.lower()
+                            else "perfume"
                         )
 
                         products.append(
@@ -108,19 +101,21 @@ class KingOfParfumsScraper(BaseScraper):
                                 url=product_url,
                                 image_url=image_url,
                                 in_stock=True,
-                                category="perfumes",
+                                category="perfume",
                                 tipo=tipo,
                             )
                         )
+                        new_count += 1
                     except Exception as e:
                         errors.append(str(e))
 
-                logger.info(f"[KingOfParfums] Página {page}: {len(items)} itens")
+                logger.info(
+                    f"[KingOfParfums] Página {page}: {len(items)} itens ({new_count} novos)"
+                )
+                if new_count == 0:
+                    break
                 page += 1
-
-            except Exception as e:
-                errors.append(f"página {page}: {e}")
-                break
+                self.delay()
 
         return ScrapingResult(
             store_slug=self.store_slug,
