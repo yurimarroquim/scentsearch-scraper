@@ -167,7 +167,7 @@ class LovableSyncService:
 
         synced = 0
         errors = 0
-        with ThreadPoolExecutor(max_workers=20) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(_sync_task, task) for task in tasks]
             for future in as_completed(futures):
                 try:
