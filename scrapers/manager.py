@@ -29,7 +29,7 @@ from scrapers.ofertasna import OfertasNaScraper
 from scrapers.guidodecants import GuidoDecantsScraper
 from scrapers.giraofertas import GiraoFertasScraper
 from database.db import get_db
-from database.models import ScrapingLog
+from database.models import ScrapingLog, Store as StoreModel
 from database.repository import (
     StoreRepository, ProductRepository, PriceRepository, ScrapingLogRepository
 )
@@ -107,7 +107,16 @@ class ScrapingManager:
             store_repo = StoreRepository(db)
             store = store_repo.get_by_slug(store_slug)
             if not store:
-                return {"error": f"Store {store_slug} not found in database"}
+                store = StoreModel(
+                    slug=store_slug,
+                    name=scraper_class.store_name,
+                    url=getattr(scraper_class, 'base_url', ''),
+                    active=True,
+                )
+                db.add(store)
+                db.commit()
+                db.refresh(store)
+                logger.info(f"Loja '{store_slug}' criada automaticamente no banco.")
 
             store_id = store.id
             store_name = store.name
