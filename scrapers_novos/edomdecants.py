@@ -1,5 +1,6 @@
 import logging
 import re
+from urllib.parse import quote
 
 import requests
 
@@ -52,7 +53,7 @@ class EdomDecantsScraper(BaseScraper):
 
             self.result.products.append(PriceData(
                 name=display_name,
-                url=STORE_WHATSAPP,
+                url=f"{STORE_WHATSAPP}?text={quote(display_name)}",
                 price=price,
                 image_url=None,
                 volume_ml=5,
