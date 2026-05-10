@@ -15,6 +15,7 @@ jobs:
       matrix:
         store:
           - albergaria
+          - edomdecants
           - leloyn
           - epoca
           - belezanaweb
