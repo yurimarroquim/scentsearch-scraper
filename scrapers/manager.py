@@ -4,6 +4,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 from scrapers.leloyn import LeLoynScraper
+from scrapers_novos.edomdecants import EdomDecantsScraper
 from scrapers_novos.albergaria import AlbergariaScraper
 from scrapers.base import ScrapingResult
 from scrapers.epoca import EpocaCosmeticosScraper
@@ -39,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 SCRAPER_REGISTRY = {
     "albergaria": AlbergariaScraper,
+    "edomdecants": EdomDecantsScraper,
     "leloyn": LeLoynScraper,
     "epoca": EpocaCosmeticosScraper,
     "belezanaweb": BelezaNaWebScraper,
