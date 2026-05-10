@@ -213,7 +213,7 @@ CATALOG = [
 
 
 class AlbergariaScraper(BaseScraper):
-    store_name = "Albergaria Parfums"
+    store_name = "Fabrício Albergaria"
     store_slug = "albergaria"
     base_url = STORE_WHATSAPP
 
