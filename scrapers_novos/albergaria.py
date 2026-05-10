@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import quote
 from scrapers.base import BaseScraper, PriceData
 
 logger = logging.getLogger(__name__)
@@ -424,9 +425,10 @@ class AlbergariaScraper(BaseScraper):
 
     def scrape(self):
         for name, price in CATALOG:
+            url = f"{STORE_WHATSAPP}?text={quote(name)}"
             self.result.products.append(PriceData(
                 name=name,
-                url=STORE_WHATSAPP,
+                url=url,
                 price=price,
                 image_url=None,
                 volume_ml=5,
