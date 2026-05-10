@@ -14,6 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         store:
+          - albergaria
           - leloyn
           - epoca
           - belezanaweb
