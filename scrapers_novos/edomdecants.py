@@ -52,8 +52,9 @@ class EdomDecantsScraper(BaseScraper):
                 continue
 
             self.result.products.append(PriceData(
-                name=display_name,
-                url=f"{STORE_WHATSAPP}?text={quote(display_name)}",
+                name=clean_name,        # só o nome, sem a marca concatenada
+                brand=marca or None,    # marca separada
+                url=f"{STORE_WHATSAPP}?text={quote(clean_name)}",
                 price=price,
                 image_url=None,
                 volume_ml=5,
