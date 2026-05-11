@@ -13,7 +13,7 @@ from database.repository import PriceRepository
 
 logger = logging.getLogger(__name__)
 
-DECANT_STORE_SLUGS = ["kingofDecants", "bhdecants", "macdecants", "sgimportados", "decantslondrina", "edomdecants"]
+DECANT_STORE_SLUGS = ["kingofDecants", "bhdecants", "macdecants", "sgimportados", "decantslondrina", "edomdecants", "albergaria"]
 
 LOVABLE_API_URL = os.environ.get("LOVABLE_API_URL", "https://scentsearch.lovable.app")
 LOVABLE_API_KEY = os.environ.get("LOVABLE_API_KEY", "")
