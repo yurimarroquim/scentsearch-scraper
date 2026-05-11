@@ -211,8 +211,6 @@ CATALOG = [
     ("Ameer - Niche Avenue", 30.0),
     ("Hadi - Niche Avenue", 35.0),
     # ── CONTRATIPOS ──────────────────────────────────────────────────────────
-    # Preço geral: 5ml = R$20 (pix)
-    # NUANCIELO
     ("Mare di Luci - Nuancielo", 20.0),
     ("Like a Boss - Nuancielo", 20.0),
     ("Domus - Nuancielo", 20.0),
@@ -257,7 +255,6 @@ CATALOG = [
     ("Zion Sanctus - Nuancielo", 20.0),
     ("Éclat Vanille - Nuancielo", 20.0),
     ("Evodia Extrait - Nuancielo", 20.0),
-    # MAISON VIEGAS
     ("Ultramare - Maison Viegas", 20.0),
     ("Elite Pour Homme - Maison Viegas", 20.0),
     ("Heaven - Maison Viegas", 20.0),
@@ -278,7 +275,6 @@ CATALOG = [
     ("Montecristo - Maison Viegas", 20.0),
     ("Amber Absolu - Maison Viegas", 20.0),
     ("Duquesa - Maison Viegas", 20.0),
-    # JA ESSENCE DE LA VIE
     ("Cactus - JA Essence de la Vie", 20.0),
     ("Chá - JA Essence de la Vie", 20.0),
     ("Monkey - JA Essence de la Vie", 20.0),
@@ -293,7 +289,6 @@ CATALOG = [
     ("Macedônia - JA Essence de la Vie", 20.0),
     ("Réplica - JA Essence de la Vie", 20.0),
     ("Amalfi - JA Essence de la Vie", 20.0),
-    # IN THE BOX
     ("Celestial Stone - In the Box", 20.0),
     ("Lemon Luxs - In the Box", 20.0),
     ("Infinite Horizon - In the Box", 20.0),
@@ -328,7 +323,6 @@ CATALOG = [
     ("Makathén - In the Box", 20.0),
     ("Lord Town - In the Box", 20.0),
     ("Liberté Absolu - In the Box", 20.0),
-    # PAR FUN
     ("Leather - Par Fun", 20.0),
     ("Electric Dream - Par Fun", 20.0),
     ("Bomb Exteme - Par Fun", 20.0),
@@ -341,7 +335,6 @@ CATALOG = [
     ("Spicy - Par Fun", 20.0),
     ("Greenly - Par Fun", 20.0),
     ("Istambul - Par Fun", 20.0),
-    # THERA
     ("Malta - Thera", 20.0),
     ("Brasili - Thera", 20.0),
     ("Amórgos - Thera", 20.0),
@@ -357,10 +350,8 @@ CATALOG = [
     ("Aspen - Thera", 20.0),
     ("Soniere - Thera", 20.0),
     ("Reserve - Thera", 20.0),
-    # LAB8
     ("Effervescent - Lab8", 20.0),
     # ── NICHO NACIONAL e GRANADO ──────────────────────────────────────────────
-    # SAPIENTIAE NICHE — 5ml = R$30
     ("Bólido - Sapientiae Niche", 30.0),
     ("Caos - Sapientiae Niche", 30.0),
     ("Seabeast - Sapientiae Niche", 30.0),
@@ -370,7 +361,6 @@ CATALOG = [
     ("Heroin - Sapientiae Niche", 30.0),
     ("Above All - Sapientiae Niche", 30.0),
     ("Graal - Sapientiae Niche", 30.0),
-    # CONDÉ — 5ml = R$65
     ("Capuccino - Condé", 65.0),
     ("Caipi d'Argent - Condé", 65.0),
     ("Cologne Bleue - Condé", 65.0),
@@ -379,7 +369,6 @@ CATALOG = [
     ("Tabac d'Or - Condé", 65.0),
     ("Vanille Bourbon - Condé", 65.0),
     ("Ambre Beige - Condé", 65.0),
-    # AMYI — 5ml = R$65
     ("2.10 (limão taiti - gengibre - moscow mule) - Amyi", 65.0),
     ("2.11 (muguet - cashmere - complexo musk) - Amyi", 65.0),
     ("5.22 (baunilha defumada - tabaco caramelizado - ládano absoluto) - Amyi", 65.0),
@@ -389,15 +378,12 @@ CATALOG = [
     ("2.13 (íris negra - ruibarbo - sândalo) - Amyi", 65.0),
     ("2.14 (mandarina coeur - gotas de orvalho - jasmin absoluto) - Amyi", 65.0),
     ("Amyi VIII (tomilho vermelho - erva flouve - camurça branca) - Amyi", 65.0),
-    # SORRY NOT SORRY — 5ml = R$65
     ("Wabi - Sorry not Sorry", 65.0),
     ("Sumo - Sorry not Sorry", 65.0),
     ("Sépia - Sorry not Sorry", 65.0),
     ("Nostalgic Velvet - Sorry not Sorry", 65.0),
-    # AMBERFIG — 5ml = R$65
     ("Citron Soleil - Amberfig", 65.0),
     ("Bamboo & Green Tea - Amberfig", 65.0),
-    # GRANADO / PHEBO — 5ml = R$33
     ("Granado Fervo Intenso - Granado", 33.0),
     ("Granado Yes, Nós Temos Banana! - Granado", 33.0),
     ("Granado Amazônico - Granado", 33.0),
@@ -424,10 +410,19 @@ class AlbergariaScraper(BaseScraper):
     base_url = STORE_WHATSAPP
 
     def scrape(self):
-        for name, price in CATALOG:
-            url = f"{STORE_WHATSAPP}?text={quote(name)}"
+        for entry, price in CATALOG:
+            if " - " in entry:
+                clean_name, brand = entry.rsplit(" - ", 1)
+                clean_name = clean_name.strip()
+                brand = brand.strip()
+            else:
+                clean_name = entry
+                brand = None
+
+            url = f"{STORE_WHATSAPP}?text={quote(entry)}"
             self.result.products.append(PriceData(
-                name=name,
+                name=clean_name,
+                brand=brand,
                 url=url,
                 price=price,
                 image_url=None,
@@ -436,5 +431,6 @@ class AlbergariaScraper(BaseScraper):
                 category="perfume",
                 tipo="decant",
             ))
+
         logger.info(f"[albergaria] {len(self.result.products)} produtos carregados do catálogo estático")
         return self.result
