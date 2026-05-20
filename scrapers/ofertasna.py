@@ -36,6 +36,13 @@ class OfertasNaScraper(BaseScraper):
         name = data.get("name", "").strip()
         url = data.get("url", "")
         image = data.get("image", "")
+        brand_data = data.get("brand", {})
+        if isinstance(brand_data, dict):
+            brand = brand_data.get("name", "").strip() or None
+        elif isinstance(brand_data, str):
+            brand = brand_data.strip() or None
+        else:
+            brand = None
         if isinstance(image, list):
             image = image[0] if image else ""
         offers = data.get("offers", {})
@@ -63,6 +70,7 @@ class OfertasNaScraper(BaseScraper):
             name=name,
             url=url,
             price=price,
+            brand=brand,
             image_url=image or None,
             volume_ml=self.parse_volume(name),
             in_stock=in_stock,
