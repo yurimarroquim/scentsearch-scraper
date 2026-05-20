@@ -12,6 +12,7 @@ CATEGORIES = [
     ("https://www.ofertasna.com.br/decant-nicho/", "decant"),
     ("https://www.ofertasna.com.br/arabes/", "frasco"),
     ("https://www.ofertasna.com.br/victoria-secret/", "frasco"),
+    ("https://www.ofertasna.com.br/perfumes1/", "frasco"),
 ]
 
 
