@@ -41,15 +41,17 @@ class RomaAromaScraper(BaseScraper):
 
                     for item in items:
                         try:
-                            name_tag = item.select_one("a.item-name")
-                            name = name_tag.get("title", "").strip() if name_tag else ""
-                            if not name:
-                                name_tag2 = item.select_one(".product-name a, h3 a")
-                                name = name_tag2.get_text(strip=True) if name_tag2 else ""
+                            link_el = (
+                                item.select_one("a.item-name")
+                                or item.select_one("a[href*='/produtos/']")
+                            )
+                            if not link_el:
+                                continue
+                            name = link_el.get("title", "").strip() or link_el.get_text(strip=True)
                             if not name:
                                 continue
+                            product_url = link_el.get("href", "")
 
-                            product_url = name_tag.get("href", "") if name_tag else ""
                             if product_url and not product_url.startswith("http"):
                                 product_url = self.base_url + product_url
 
