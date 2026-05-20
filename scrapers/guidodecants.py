@@ -34,6 +34,8 @@ class GuidoDecantsScraper(BaseScraper):
         image = data.get("image", "")
         if isinstance(image, list):
             image = image[0] if image else ""
+        if not isinstance(image, str) or not image.startswith("http"):
+            image = ""    
         offers = data.get("offers", {})
         if isinstance(offers, list):
             price = None
@@ -119,6 +121,8 @@ class GuidoDecantsScraper(BaseScraper):
                 price = self._parse_tn_price(price_str)
                 img = item.find("img")
                 image_url = (img.get("src") or img.get("data-src")) if img else None
+                if image_url and not image_url.startswith("http"):  
+                    image_url = None
                 if not name or not price or price <= 0:
                     continue
                 products.append(
