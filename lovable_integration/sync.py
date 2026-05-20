@@ -80,8 +80,9 @@ class LovableSyncService:
         if r.status_code not in (200, 201):
             logger.error(f"Erro ao enviar perfume {product.name}: {r.status_code} {r.text}")
             return {"status": "error", "reason": f"Perfume: {r.status_code}"}
+        returned_slug = r.json().get("slug", slug)
         preco_payload = {
-            "perfume_slug": slug,
+            "perfume_slug": returned_slug,
             "loja": store.name,
             "preco": float(latest_price.price),
             "link_afiliado": make_deeplink(store.slug, product.url),
@@ -149,11 +150,12 @@ class LovableSyncService:
                 if r.status_code not in (200, 201):
                     logger.error(f"[SYNC] perfume '{name}' slug='{slug}': {r.status_code} {r.text[:300]}")
                     return "error"
+                returned_slug = r.json().get("slug", slug)
             except Exception as e:
                 logger.error(f"[SYNC] exception perfume '{name}': {e}")
                 return "error"
             preco_payload = {
-                "perfume_slug": slug,
+                "perfume_slug": returned_slug,
                 "loja": store_name,
                 "preco": price,
                 "link_afiliado": make_deeplink(store_slug, url),
@@ -162,7 +164,7 @@ class LovableSyncService:
             try:
                 r = _post_with_retry(f"{self.base_url}/api/ingest/precos", preco_payload, self.headers)
                 if r.status_code not in (200, 201):
-                    logger.error(f"[SYNC] preço '{name}' slug='{slug}': {r.status_code} {r.text[:300]}")
+                    logger.error(f"[SYNC] preço '{name}' slug='{returned_slug}': {r.status_code} {r.text[:300]}")
                     return "error"
             except Exception as e:
                 logger.error(f"[SYNC] exception preço '{name}': {e}")
