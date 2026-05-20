@@ -11,8 +11,6 @@ class SephoraBrasilScraper(BaseScraper):
 
     SEARCH_URLS = [
         f"{base_url}/perfumes",
-        f"{base_url}/perfumes/perfumes-femininos",
-        f"{base_url}/perfumes/perfumes-masculinos",
     ]
 
     def scrape(self) -> ScrapingResult:
