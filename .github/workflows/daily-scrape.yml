@@ -38,6 +38,7 @@ jobs:
           - neeche
           - ofertasna
           - guidodecants
+          - giraofertas
 
     steps:
       - uses: actions/checkout@v4
