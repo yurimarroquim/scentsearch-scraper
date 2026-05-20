@@ -7,7 +7,7 @@ class AnmyScraper(BaseScraper):
     store_name = "AnMY Perfumes"
     store_slug = "anmy"
     base_url = "https://www.anmyperfumes.com.br"
-    CATEGORIES = ["/masculino", "/feminino", "/arabian", "/tester", "/perfume-unissex"]
+    CATEGORIES = ["/masculino", "/feminino", "/arabian", "/tester"]
 
     def scrape(self) -> ScrapingResult:
         products = []
@@ -21,7 +21,7 @@ class AnmyScraper(BaseScraper):
             while True:
                 url = f"{self.base_url}{category_path}"
                 try:
-                    soup = self.get_page(url, params={"page": page})
+                    soup = self.get_page(url, params={"pagina": page})
                     items = soup.select("li.span3")
                     if not items:
                         break
