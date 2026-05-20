@@ -20,7 +20,7 @@ LOVABLE_API_KEY = os.environ.get("LOVABLE_API_KEY", "")
 
 RAKUTEN_ID = "bvmD8pUGdGc"
 AFFILIATE_MIDS = {
-    "opaque": "47714",
+    "belezanaweb": "47089",
 }
 
 
@@ -147,8 +147,10 @@ class LovableSyncService:
             try:
                 r = _post_with_retry(f"{self.base_url}/api/ingest/perfumes", perfume_payload, self.headers)
                 if r.status_code not in (200, 201):
+                    logger.error(f"[SYNC] perfume '{name}' slug='{slug}': {r.status_code} {r.text[:300]}")
                     return "error"
-            except Exception:
+            except Exception as e:
+                logger.error(f"[SYNC] exception perfume '{name}': {e}")
                 return "error"
             preco_payload = {
                 "perfume_slug": slug,
@@ -160,8 +162,10 @@ class LovableSyncService:
             try:
                 r = _post_with_retry(f"{self.base_url}/api/ingest/precos", preco_payload, self.headers)
                 if r.status_code not in (200, 201):
+                    logger.error(f"[SYNC] preço '{name}' slug='{slug}': {r.status_code} {r.text[:300]}")
                     return "error"
-            except Exception:
+            except Exception as e:
+                logger.error(f"[SYNC] exception preço '{name}': {e}")
                 return "error"
             return "synced"
 
