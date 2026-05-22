@@ -79,12 +79,13 @@ class LovableSyncService:
         if not latest_price:
             return {"status": "skipped", "reason": "Sem dados de preço"}
         slug = self._generate_slug(product.name)
+        tipo = "decant" if store.slug in DECANT_STORE_SLUGS else "perfume"
         perfume_payload = {
             "nome": product.name,
             "marca": product.brand or "Sem marca",
             "imagem_url": product.image_url or "https://placehold.co/400x400?text=Perfume",
             "slug": slug,
-            "tipo": "decant" if store.slug in DECANT_STORE_SLUGS else "perfume",
+            "tipo": tipo,
             "nome_normalizado": compute_nome_normalizado(product.name, product.brand or ""),
         }
         try:
@@ -102,6 +103,7 @@ class LovableSyncService:
             "preco": float(latest_price.price),
             "link_afiliado": make_deeplink(store.slug, product.url),
             "disponivel": True,
+            "tipo": tipo,
         }
         try:
             r = _post_with_retry(f"{self.base_url}/api/ingest/precos", preco_payload, self.headers)
@@ -181,6 +183,7 @@ class LovableSyncService:
                 "preco": price,
                 "link_afiliado": make_deeplink(store_slug, url),
                 "disponivel": True,
+                "tipo": tipo,
             }
             try:
                 r = _post_with_retry(f"{self.base_url}/api/ingest/precos", preco_payload, self.headers)
