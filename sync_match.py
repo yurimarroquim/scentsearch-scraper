@@ -28,13 +28,11 @@ PURE_DECANT_SLUGS = {"kingofDecants", "bhdecants", "decantslondrina"}
 AFFILIATE_MIDS = {"opaque": "47714"}
 RAKUTEN_ID = "bvmD8pUGdGc"
 
-
 def make_deeplink(store_slug, url):
     mid = AFFILIATE_MIDS.get(store_slug)
     if mid:
         return f"https://click.linksynergy.com/deeplink?id={RAKUTEN_ID}&mid={mid}&murl={quote(url, safe='')}"
     return url
-
 
 def get_tipo(store_slug, name, url):
     """Determina se o produto é frasco ou decant por loja e por nome/URL."""
@@ -43,7 +41,6 @@ def get_tipo(store_slug, name, url):
     if "decant" in name.lower() or "decant" in url.lower():
         return "decant"
     return "frasco"
-
 
 def clean_name(nome, marca=""):
     nome = nome.strip()
@@ -63,7 +60,6 @@ def clean_name(nome, marca=""):
         flags=re.IGNORECASE,
     )
     return nome.strip(" -–")
-
 
 def load_catalog():
     log.info("Carregando catálogo do Supabase...")
@@ -85,14 +81,16 @@ def load_catalog():
     log.info(f"Catálogo: {len(all_perfumes):,} perfumes carregados")
     return all_perfumes
 
-
-def build_index(catalog):
-    index = {}
+def build_indexes(catalog):
+    frasco_index = {}
+    decant_index = {}
     for p in catalog:
         key = f"{p['marca']} {p['nome']}".lower().strip()
-        index[key] = p["slug"]
-    return index
-
+        if p["tipo"] == "decant":
+            decant_index[key] = p["slug"]
+        else:
+            frasco_index[key] = p["slug"]
+    return frasco_index, decant_index
 
 def find_slug(nome, marca, index, catalog, threshold=80):
     clean = clean_name(nome, marca)
@@ -101,7 +99,6 @@ def find_slug(nome, marca, index, catalog, threshold=80):
     if result and result[1] >= threshold:
         return index[result[0]], result[1]
     return None, 0
-
 
 def send_price(slug, store_name, price, url, store_slug, tipo):
     try:
@@ -123,10 +120,9 @@ def send_price(slug, store_name, price, url, store_slug, tipo):
         log.warning(f"Erro ao enviar preço: {e}")
         return False
 
-
 def run():
     catalog = load_catalog()
-    index = build_index(catalog)
+    frasco_index, decant_index = build_indexes(catalog)
 
     conn = sqlite3.connect(
         "/home/runner/workspace/artifacts/scentsearch-scraper/data/scentsearch.db"
@@ -165,6 +161,7 @@ def run():
             continue
 
         tipo = get_tipo(row["store_slug"], row["name"], row["url"])
+        index = decant_index if tipo == "decant" else frasco_index
         slug, score = find_slug(row["name"], row["brand"] or "", index, catalog)
 
         if slug:
@@ -194,7 +191,6 @@ def run():
     log.info(
         f"=== Concluído: matched={matched} sent={sent} unmatched={unmatched} erros={erros} ==="
     )
-
 
 if __name__ == "__main__":
     run()
