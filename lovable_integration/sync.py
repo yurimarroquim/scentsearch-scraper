@@ -24,6 +24,20 @@ AFFILIATE_MIDS = {
 }
 
 
+def compute_nome_normalizado(nome: str, marca: str) -> str:
+    norm = nome.strip()
+    if marca:
+        norm = re.sub(
+            r'\s+' + re.escape(marca) + r'(\s+(edp|edt|parfum))?$',
+            '', norm, flags=re.IGNORECASE
+        ).strip()
+        norm = re.sub(
+            r'^(' + re.escape(marca) + r'\s+)+',
+            '', norm, flags=re.IGNORECASE
+        ).strip()
+    return norm.lower()
+
+
 def make_deeplink(store_slug: str, url: str) -> str:
     mid = AFFILIATE_MIDS.get(store_slug)
     if mid:
@@ -71,6 +85,7 @@ class LovableSyncService:
             "imagem_url": product.image_url or "https://placehold.co/400x400?text=Perfume",
             "slug": slug,
             "tipo": "decant" if store.slug in DECANT_STORE_SLUGS else "perfume",
+            "nome_normalizado": compute_nome_normalizado(product.name, product.brand or ""),
         }
         try:
             r = _post_with_retry(f"{self.base_url}/api/ingest/perfumes", perfume_payload, self.headers)
@@ -134,16 +149,22 @@ class LovableSyncService:
 
         logger.info(f"Sincronizando {len(tasks)} produtos em paralelo...")
 
+        SKIP_KEYWORDS = ("kit ", "coffret", "desodorante", " duo ", " trio ", " combo")
+
         def _sync_task(task):
             name, brand, image_url, url, store_slug, store_name, price = task
+            if any(kw in name.lower() for kw in SKIP_KEYWORDS):
+                return "skipped"
             slug = self._generate_slug(name)
             tipo = "decant" if store_slug in DECANT_STORE_SLUGS else "perfume"
+            valid_image = image_url if (image_url and image_url.startswith("http")) else "https://placehold.co/600x600?text=Perfume"
             perfume_payload = {
                 "nome": name,
                 "marca": brand or "Sem marca",
-                "imagem_url": image_url or "https://placehold.co/400x400?text=Perfume",
+                "imagem_url": valid_image,
                 "slug": slug,
                 "tipo": tipo,
+                "nome_normalizado": compute_nome_normalizado(name, brand or ""),
             }
             try:
                 r = _post_with_retry(f"{self.base_url}/api/ingest/perfumes", perfume_payload, self.headers)
@@ -204,7 +225,7 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
     load_dotenv(dotenv_path=".env")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
-                        handlers=[logging.FileHandler("/tmp/sync3.log"), logging.StreamHandler()])
+                        handlers=[logging.FileHandler("sync3.log"), logging.StreamHandler()])
     limit = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     service = LovableSyncService()
     print(f"API disponível: {service.is_available()}")
