@@ -15,6 +15,22 @@ DECANT_SLUGS = {"kingofDecants","bhdecants","macdecants","sgimportados","decants
 RAKUTEN_ID = "bvmD8pUGdGc"
 AFFILIATE_MIDS = {"opaque": "47714"}
 
+# Produtos que não são perfume — bloqueados antes de entrar no Supabase
+BLOCKED_KEYWORDS = [
+    "batom", "lipstick", "lip balm", "lip gloss", "lip color", "lip liner",
+    "gel de banho", "shower gel", "body wash", "sabonete", "soap",
+    "maquiagem", "makeup", "sombra", "blush", "rimel", "rímel", "mascara",
+    "delineador", "iluminador", "bronzer", "base facial", "foundation",
+    "loção corporal", "body lotion", "creme corporal", "hidratante corporal",
+    "shampoo", "condicionador", "conditioner",
+    "sérum facial", "serum facial", "protetor solar", "sunscreen",
+    "esmalte", "nail polish", "demaquilante",
+]
+
+def is_perfume(name: str) -> bool:
+    name_lower = name.lower()
+    return not any(kw in name_lower for kw in BLOCKED_KEYWORDS)
+
 def slugify(name):
     s = name.lower()
     for a, b in [("áàãâä","a"),("éèêë","e"),("íìîï","i"),("óòõôö","o"),("úùûü","u"),("ç","c")]:
@@ -56,8 +72,13 @@ def run():
     perfumes_ok = 0
     precos_ok = 0
     erros = 0
+    ignorados = 0
 
     for i, row in enumerate(rows):
+        if not is_perfume(row["name"]):
+            ignorados += 1
+            continue
+
         slug = slugify(row["name"])
         tipo = "decant" if row["store_slug"] in DECANT_SLUGS else "perfume"
 
@@ -91,9 +112,9 @@ def run():
             erros += 1
 
         if (i+1) % 100 == 0:
-            log.info(f"  [{i+1}/{len(rows)}] perfumes: {perfumes_ok} | precos: {precos_ok} | erros: {erros}")
+            log.info(f"  [{i+1}/{len(rows)}] perfumes: {perfumes_ok} | precos: {precos_ok} | erros: {erros} | ignorados: {ignorados}")
 
-    log.info(f"=== Concluído: {perfumes_ok} perfumes | {precos_ok} preços | {erros} erros ===")
+    log.info(f"=== Concluído: {perfumes_ok} perfumes | {precos_ok} preços | {erros} erros | {ignorados} ignorados (não-perfume) ===")
 
 if __name__ == "__main__":
     run()
