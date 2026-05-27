@@ -4,7 +4,6 @@ from datetime import datetime, timezone, timedelta
 
 BRASILIA = timezone(timedelta(hours=-3))
 sync_ran_today = None
-dedup_ran_today = None
 alert_ran_today = None
 
 print("Scheduler iniciado.", flush=True)
@@ -20,14 +19,6 @@ while True:
             cwd="/home/runner/workspace/artifacts/scentsearch-scraper",
         )
         sync_ran_today = hoje
-
-    if agora.hour == 4 and agora.minute == 0 and dedup_ran_today != hoje:
-        print(f"[{agora}] Executando dedup_geral...", flush=True)
-        subprocess.run(
-            ["python3", "dedup_geral.py", "--apply"],
-            cwd="/home/runner/workspace/artifacts/scentsearch-scraper",
-        )
-        dedup_ran_today = hoje
 
     if agora.hour == 8 and agora.minute == 0 and alert_ran_today != hoje:
         print(f"[{agora}] Executando alert_checker...", flush=True)

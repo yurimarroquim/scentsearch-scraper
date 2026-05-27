@@ -117,5 +117,11 @@ def run():
 
     log.info(f"=== Concluído: {perfumes_ok} perfumes | {precos_ok} preços | {erros} erros | {ignorados} ignorados (não-perfume) ===")
 
+    log.info("Iniciando dedup pós-sync...")
+    import subprocess, sys
+    subprocess.run([sys.executable, "dedup_geral.py", "--apply"],
+                   cwd=os.path.dirname(os.path.abspath(__file__)))
+    log.info("Dedup concluído.")
+
 if __name__ == "__main__":
     run()
