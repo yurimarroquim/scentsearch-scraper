@@ -74,6 +74,7 @@ def run():
     erros = 0
     ignorados = 0
 
+    ignorados = 0
     for i, row in enumerate(rows):
         if not is_perfume(row["name"]):
             ignorados += 1
@@ -86,7 +87,7 @@ def run():
             # Upsert perfume
             sb.table("perfumes").upsert({
                 "nome": row["name"],
-                "marca": row["brand"] or "Sem marca",
+                "marca": (row["brand"] or "Sem marca").strip().title(),
                 "imagem_url": row["image_url"] or "https://placehold.co/400x400?text=Perfume",
                 "slug": slug,
                 "tipo": tipo,
