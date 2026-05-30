@@ -108,6 +108,13 @@ def run():
             }, on_conflict="perfume_id,loja").execute()
             precos_ok += 1
 
+            # Registra snapshot diário no histórico
+            sb.table("historico_precos").upsert({
+                "perfume_id": perfume_id,
+                "loja": row["store_name"],
+                "preco": float(row["price"]),
+            }, on_conflict="perfume_id,loja,data").execute()
+
         except Exception as e:
             log.warning(f"Erro em '{row['name']}': {e}")
             erros += 1
