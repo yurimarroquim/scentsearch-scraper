@@ -126,6 +126,9 @@ def load_catalog(supabase):
 def build_index(catalog):
     brand_groups = collections.defaultdict(list)
     full_choices = {}
+    nome_choices = {}
+    nome_word_index = collections.defaultdict(set)  # palavra → ids com essa palavra no nome
+
     for p in catalog:
         b = normalize(p["marca"] or "")
         n = normalize(p["nome"]  or "")
@@ -133,12 +136,17 @@ def build_index(catalog):
             continue
         brand_groups[b].append({"id": p["id"], "name_norm": n})
         full_choices[p["id"]] = f"{b} {n}".strip()
+        nome_choices[p["id"]] = n
+        for word in n.split():
+            if len(word) > 3:
+                nome_word_index[word].add(p["id"])
+
     brand_keys = list(brand_groups.keys())
     log.info(f"Índice: {len(brand_keys):,} marcas | {len(full_choices):,} produtos")
-    return brand_groups, brand_keys, full_choices
+    return brand_groups, brand_keys, full_choices, nome_choices, nome_word_index
 
 
-def find_match(par_brand, par_name, brand_groups, brand_keys, full_choices):
+def find_match(par_brand, par_name, brand_groups, brand_keys, full_choices, nome_choices, nome_word_index):
     candidates = None
     if par_brand and par_brand in brand_groups:
         candidates = brand_groups[par_brand]
@@ -152,6 +160,21 @@ def find_match(par_brand, par_name, brand_groups, brand_keys, full_choices):
         nm = process.extractOne(par_name, name_choices, scorer=fuzz.token_set_ratio)
         if nm and nm[1] >= NAME_THRESHOLD:
             return nm[2], nm[1]
+
+    # Fase 1.5: marca do Parfumo aparece dentro do nome ScentSearch
+    # Resolve casos como marca="Aventus" no site mas Brand="Creed" no Parfumo
+    if par_brand and par_name:
+        brand_words = [w for w in par_brand.split() if len(w) > 3]
+        if brand_words:
+            matching_ids = None
+            for word in brand_words:
+                ids = nome_word_index.get(word, set())
+                matching_ids = ids if matching_ids is None else matching_ids & ids
+            if matching_ids:
+                id_to_nome = {pid: nome_choices[pid] for pid in matching_ids if pid in nome_choices}
+                nm = process.extractOne(par_name, id_to_nome, scorer=fuzz.token_set_ratio)
+                if nm and nm[1] >= NAME_THRESHOLD:
+                    return nm[2], nm[1]
 
     query = f"{par_brand} {par_name}".strip()
     if query:
@@ -187,7 +210,7 @@ def tem_dado(row):
 def run():
     supabase = get_client()
     catalog  = load_catalog(supabase)
-    brand_groups, brand_keys, full_choices = build_index(catalog)
+    brand_groups, brand_keys, full_choices, nome_choices, nome_word_index = build_index(catalog)
 
     try:
         df = pd.read_csv(CSV_PATH, encoding="utf-8")
@@ -213,7 +236,7 @@ def run():
 
         par_brand = normalize(row.get("Brand", ""))
         par_name  = normalize(row.get("Name",  ""))
-        perfume_id, score = find_match(par_brand, par_name, brand_groups, brand_keys, full_choices)
+        perfume_id, score = find_match(par_brand, par_name, brand_groups, brand_keys, full_choices, nome_choices, nome_word_index)
 
         if not perfume_id:
             sem_match += 1

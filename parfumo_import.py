@@ -1,15 +1,12 @@
 """
-parfumo_rating_import.py — Importa Rating_Value e Rating_Count do dataset Parfumo
-para as colunas rating_parfumo e rating_count_parfumo da tabela perfumes.
+parfumo_import.py — Importa pirâmide olfativa do dataset Parfumo para o banco ScentSearch.
 
-PRÉ-REQUISITO: executar no Supabase SQL Editor antes de rodar:
-  ALTER TABLE perfumes ADD COLUMN IF NOT EXISTS rating_parfumo NUMERIC;
-  ALTER TABLE perfumes ADD COLUMN IF NOT EXISTS rating_count_parfumo INTEGER;
+Estratégia de matching (2 fases):
+  1. Filtra candidatos pela marca (fuzzy ≥ 85)
+  2. Dentro da marca, faz match pelo nome (token_set_ratio ≥ 75)
+  Fallback: match combinado marca+nome (≥ 80) se a marca não for encontrada.
 
-Usa o mesmo matching de 2 fases do parfumo_import.py:
-  1. Fuzzy match de marca (≥ 85)
-  2. Fuzzy match de nome dentro da marca (≥ 75)
-  Fallback: match combinado marca+nome (≥ 80)
+Usa nome/marca (sempre preenchidos) em vez de nome_normalizado/marca_normalizada.
 """
 import os, re, time, logging, unicodedata, collections
 import pandas as pd
@@ -19,13 +16,12 @@ from rapidfuzz import process, fuzz
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 
-CSV_PATH        = r"c:\Users\yurim\OneDrive\Área de Trabalho\ScentSearch\database_fragrantica\parfumo_data_clean.csv"
-CHECKPOINT_FILE = r"c:\Users\yurim\OneDrive\Área de Trabalho\scentsearch-scraper\parfumo_rating_checkpoint.txt"
+CSV_PATH       = r"c:\Users\yurim\OneDrive\Área de Trabalho\ScentSearch\database_fragrantica\parfumo_data_clean.csv"
+CHECKPOINT_FILE = r"c:\Users\yurim\OneDrive\Área de Trabalho\scentsearch-scraper\parfumo_checkpoint.txt"
 
-BRAND_THRESHOLD = 85
-NAME_THRESHOLD  = 75
-FULL_THRESHOLD  = 80
-BATCH_SIZE      = 200  # upserts por lote
+BRAND_THRESHOLD = 85   # score mínimo para aceitar match de marca
+NAME_THRESHOLD  = 75   # score mínimo para aceitar match de nome (dentro da marca)
+FULL_THRESHOLD  = 80   # score mínimo para o fallback marca+nome combinado
 
 
 def normalize(text):
@@ -35,7 +31,14 @@ def normalize(text):
     return re.sub(r"[^a-z0-9\s]+", " ", text.lower()).strip()
 
 
+def parse_notes(value):
+    if not value or str(value).strip().upper() in ("NA", "NAN"):
+        return []
+    return [n.strip() for n in str(value).split(",") if n.strip()]
+
+
 def load_catalog(supabase):
+    """Carrega todos os perfumes do banco usando nome e marca (sempre preenchidos)."""
     all_perfumes = []
     offset = 0
     while True:
@@ -54,6 +57,27 @@ def load_catalog(supabase):
             break
     log.info(f"Catálogo: {len(all_perfumes):,} perfumes carregados")
     return all_perfumes
+
+
+def load_existentes(supabase):
+    existentes = set()
+    offset = 0
+    while True:
+        batch = (
+            supabase.table("notas_olfativas")
+            .select("perfume_id")
+            .range(offset, offset + 999)
+            .execute()
+            .data
+        )
+        if not batch:
+            break
+        existentes.update(r["perfume_id"] for r in batch)
+        offset += 1000
+        if len(batch) < 1000:
+            break
+    log.info(f"Já com notas: {len(existentes):,} perfumes")
+    return existentes
 
 
 def build_index(catalog):
@@ -80,7 +104,11 @@ def build_index(catalog):
 
 
 def find_match(par_brand, par_name, brand_groups, brand_keys, full_choices, nome_choices, nome_word_index):
+    """Retorna (perfume_id, score) ou (None, 0)."""
+
+    # --- Fase 1: encontrar a marca no catálogo ---
     candidates = None
+
     if par_brand and par_brand in brand_groups:
         candidates = brand_groups[par_brand]
     elif par_brand:
@@ -88,13 +116,15 @@ def find_match(par_brand, par_name, brand_groups, brand_keys, full_choices, nome
         if bm and bm[1] >= BRAND_THRESHOLD:
             candidates = brand_groups[bm[0]]
 
+    # --- Fase 2: match de nome dentro da marca ---
     if candidates and par_name:
         name_choices = {c["id"]: c["name_norm"] for c in candidates}
         nm = process.extractOne(par_name, name_choices, scorer=fuzz.token_set_ratio)
         if nm and nm[1] >= NAME_THRESHOLD:
             return nm[2], nm[1]
 
-    # Fase 1.5: marca do Parfumo aparece dentro do nome ScentSearch
+    # --- Fase 1.5: marca do Parfumo aparece dentro do nome ScentSearch ---
+    # Resolve casos como marca="Aventus" no site mas Brand="Creed" no Parfumo
     if par_brand and par_name:
         brand_words = [w for w in par_brand.split() if len(w) > 3]
         if brand_words:
@@ -108,6 +138,7 @@ def find_match(par_brand, par_name, brand_groups, brand_keys, full_choices, nome
                 if nm and nm[1] >= NAME_THRESHOLD:
                     return nm[2], nm[1]
 
+    # --- Fallback: match combinado ---
     query = f"{par_brand} {par_name}".strip()
     if query:
         fm = process.extractOne(query, full_choices, scorer=fuzz.token_set_ratio)
@@ -117,39 +148,29 @@ def find_match(par_brand, par_name, brand_groups, brand_keys, full_choices, nome
     return None, 0
 
 
-def flush_batch(supabase, batch):
-    import json
-    for attempt in range(5):
-        try:
-            supabase.rpc("bulk_update_ratings", {"data": batch}).execute()
-            return
-        except Exception as e:
-            if attempt < 4:
-                wait = 2 ** attempt
-                log.warning(f"Erro de rede (tentativa {attempt+1}/5), aguardando {wait}s: {e}")
-                time.sleep(wait)
-            else:
-                raise
-
-
 def run():
-    supabase = get_client()
-    catalog  = load_catalog(supabase)
+    supabase   = get_client()
+    catalog    = load_catalog(supabase)
+    existentes = load_existentes(supabase)
+
     brand_groups, brand_keys, full_choices, nome_choices, nome_word_index = build_index(catalog)
 
+    # Lê CSV — tenta UTF-8 primeiro, depois latin-1
     try:
         df = pd.read_csv(CSV_PATH, encoding="utf-8")
     except UnicodeDecodeError:
         df = pd.read_csv(CSV_PATH, encoding="latin-1")
     log.info(f"Parfumo CSV: {len(df):,} fragrâncias")
 
-    # Filtra apenas linhas com rating válido
-    df_rated = df[
-        df["Rating_Value"].notna() &
-        (df["Rating_Value"].astype(str).str.upper() != "NA") &
-        (df["Rating_Value"].astype(str).str.strip() != "")
-    ].copy()
-    log.info(f"Com rating: {len(df_rated):,}")
+    def tem_nota(row):
+        for col in ["Top_Notes", "Middle_Notes", "Base_Notes"]:
+            v = str(row.get(col, "")).strip()
+            if v and v.upper() not in ("NA", "NAN"):
+                return True
+        return False
+
+    df_com_notas = df[df.apply(tem_nota, axis=1)].copy()
+    log.info(f"Com pelo menos uma nota: {len(df_com_notas):,}")
 
     # Checkpoint
     start_idx = 0
@@ -158,52 +179,71 @@ def run():
             start_idx = int(f.read().strip())
         log.info(f"Retomando do índice {start_idx}")
 
-    ok = sem_match = 0
-    pending_batch = []
+    ok = sem_match = ja_tem = sem_notas = 0
 
-    for i, (_, row) in enumerate(df_rated.iterrows()):
+    for i, (_, row) in enumerate(df_com_notas.iterrows()):
         if i < start_idx:
+            continue
+
+        topo    = parse_notes(row.get("Top_Notes"))
+        coracao = parse_notes(row.get("Middle_Notes"))
+        base    = parse_notes(row.get("Base_Notes"))
+        acordes = parse_notes(row.get("Main_Accords"))
+
+        if not topo and not coracao and not base:
+            sem_notas += 1
             continue
 
         par_brand = normalize(row.get("Brand", ""))
         par_name  = normalize(row.get("Name",  ""))
+
         perfume_id, score = find_match(par_brand, par_name, brand_groups, brand_keys, full_choices, nome_choices, nome_word_index)
 
         if not perfume_id:
             sem_match += 1
             continue
 
-        try:
-            rating_val   = float(str(row["Rating_Value"]).replace(",", "."))
-            rating_count_raw = str(row.get("Rating_Count", "")).strip()
-            rating_count = int(float(rating_count_raw)) if rating_count_raw.upper() not in ("NA", "NAN", "") else None
-        except (ValueError, TypeError):
-            sem_match += 1
+        if perfume_id in existentes:
+            ja_tem += 1
             continue
 
-        pending_batch.append({
-            "id": perfume_id,
-            "rating_parfumo": rating_val,
-            "rating_count_parfumo": rating_count,
-        })
+        for attempt in range(5):
+            try:
+                supabase.table("notas_olfativas").upsert(
+                    {
+                        "perfume_id": perfume_id,
+                        "topo":    topo,
+                        "coracao": coracao,
+                        "base":    base,
+                        "acordes": acordes,
+                    },
+                    on_conflict="perfume_id",
+                ).execute()
+                break
+            except Exception as e:
+                if attempt < 4:
+                    wait = 2 ** attempt
+                    log.warning(f"Erro de rede (tentativa {attempt+1}/5), aguardando {wait}s: {e}")
+                    time.sleep(wait)
+                else:
+                    raise
+
+        existentes.add(perfume_id)
         ok += 1
 
-        if len(pending_batch) >= BATCH_SIZE:
-            flush_batch(supabase, pending_batch)
-            pending_batch = []
-            log.info(f"  [{i+1}/{len(df_rated)}] atualizados: {ok} | sem match: {sem_match}")
+        if ok % 200 == 0:
+            log.info(f"  [{i+1}/{len(df_com_notas)}] inseridos: {ok} | sem match: {sem_match} | já tinham: {ja_tem}")
             with open(CHECKPOINT_FILE, "w") as f:
                 f.write(str(i))
-
-    if pending_batch:
-        flush_batch(supabase, pending_batch)
 
     if os.path.exists(CHECKPOINT_FILE):
         os.remove(CHECKPOINT_FILE)
 
     log.info("=" * 40)
-    log.info(f"Atualizados: {ok:,}")
-    log.info(f"Sem match:   {sem_match:,}")
+    log.info(f"Inseridos:  {ok:,}")
+    log.info(f"Já tinham:  {ja_tem:,}")
+    log.info(f"Sem match:  {sem_match:,}")
+    log.info(f"Sem notas:  {sem_notas:,}")
 
 
 def get_client():
