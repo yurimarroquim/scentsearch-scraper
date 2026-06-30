@@ -24,6 +24,28 @@ AFFILIATE_MIDS = {
 }
 
 
+CONC_MAP = {
+    "Eau de Parfum":   [r"eau\s+de\s+parfum", r"\bedp\b"],
+    "Eau de Toilette": [r"eau\s+de\s+toilette", r"\bedt\b"],
+    "Eau de Cologne":  [r"eau\s+de\s+cologne", r"\bedc\b"],
+    "Parfum":          [r"\bparfum\b", r"\bextrait\b"],
+}
+
+
+def get_concentration(nome: str) -> Optional[str]:
+    t = nome.lower()
+    for conc, pats in CONC_MAP.items():
+        for p in pats:
+            if re.search(p, t):
+                return conc
+    return None
+
+
+def get_volume(nome: str) -> Optional[int]:
+    m = re.search(r"(\d+)\s*ml\b", nome, re.IGNORECASE)
+    return int(m.group(1)) if m else None
+
+
 def compute_nome_normalizado(nome: str, marca: str) -> str:
     norm = nome.strip()
     if marca:
@@ -87,6 +109,8 @@ class LovableSyncService:
             "slug": slug,
             "tipo": tipo,
             "nome_normalizado": compute_nome_normalizado(product.name, product.brand or ""),
+            "concentracao": get_concentration(product.name),
+            "volume_ml": get_volume(product.name),
         }
         try:
             r = _post_with_retry(f"{self.base_url}/api/ingest/perfumes", perfume_payload, self.headers)
@@ -167,6 +191,8 @@ class LovableSyncService:
                 "slug": slug,
                 "tipo": tipo,
                 "nome_normalizado": compute_nome_normalizado(name, brand or ""),
+                "concentracao": get_concentration(name),
+                "volume_ml": get_volume(name),
             }
             try:
                 r = _post_with_retry(f"{self.base_url}/api/ingest/perfumes", perfume_payload, self.headers)
