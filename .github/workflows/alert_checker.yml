@@ -1,0 +1,28 @@
+name: Alert Checker
+
+on:
+  schedule:
+    - cron: '0 11 * * *'  # 8h horário de Brasília (UTC-3)
+  workflow_dispatch:       # permite rodar manualmente
+
+jobs:
+  check-alerts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: pip install requests
+
+      - name: Rodar alert checker
+        env:
+          LOVABLE_API_KEY: ${{ secrets.LOVABLE_API_KEY }}
+          LOVABLE_API_URL: ${{ secrets.LOVABLE_API_URL }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_TEMPLATE_ID: ${{ secrets.BREVO_TEMPLATE_ID }}
+        run: python alert_checker.py

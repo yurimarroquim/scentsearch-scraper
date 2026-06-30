@@ -8,142 +8,102 @@ Agendar no Replit como cron: 0 8 * * *  (todo dia às 8h)
 
 import os
 import logging
-from datetime import datetime
-from supabase import create_client, Client
 import requests
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 log = logging.getLogger(__name__)
 
-SUPABASE_URL      = os.environ["SUPABASE_URL"]
-SUPABASE_KEY      = os.environ["SUPABASE_SERVICE_KEY"]
-BREVO_API_KEY     = os.environ["BREVO_API_KEY"]
-BREVO_TEMPLATE_ID = int(os.environ.get("BREVO_TEMPLATE_ID", "1"))
-FROM_EMAIL        = os.environ.get("FROM_EMAIL", "alertas@scentsearch.com.br")
-FROM_NAME         = os.environ.get("FROM_NAME", "ScentSearch Alertas")
-SITE_URL          = os.environ.get("SITE_URL", "https://scentsearch.com.br")
+BASE_URL = os.environ.get("LOVABLE_API_URL", "https://scentsearch.com.br")
+API_KEY = os.environ["LOVABLE_API_KEY"]
+BREVO_KEY = os.environ["BREVO_API_KEY"]
+TEMPLATE_ID = int(os.environ.get("BREVO_TEMPLATE_ID", "1"))
+FROM_EMAIL = os.environ.get("FROM_EMAIL", "alertas@scentsearch.com.br")
+FROM_NAME = os.environ.get("FROM_NAME", "ScentSearch Alertas")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+AUTH = {"Authorization": f"Bearer {API_KEY}"}
 
-def buscar_alertas_pendentes():
-    resp = (
-        supabase.table("price_alerts")
-        .select("id, email, perfume_id, perfume_nome, target_price")
-        .eq("status", "pending")
-        .execute()
+
+def buscar_alertas():
+    r = requests.get(f"{BASE_URL}/api/public/price-alerts", headers=AUTH, timeout=30)
+    r.raise_for_status()
+    return r.json().get("alerts", [])
+
+
+def marcar_notificado(alert_id, email):
+    r = requests.patch(
+        f"{BASE_URL}/api/public/price-alerts/{alert_id}/notify",
+        headers=AUTH,
+        json={"email": email},
+        timeout=30,
     )
-    return resp.data or []
+    r.raise_for_status()
 
-def buscar_menor_preco(perfume_id):
-    resp = (
-        supabase.table("precos")
-        .select("preco, loja, link_afiliado")
-        .eq("perfume_id", perfume_id)
-        .eq("disponivel", True)
-        .order("preco", desc=False)
-        .limit(1)
-        .execute()
-    )
-    return resp.data[0] if resp.data else None
 
-def marcar_como_notificado(alert_id):
-    supabase.table("price_alerts").update({
-        "status": "notified",
-        "notified_at": datetime.utcnow().isoformat()
-    }).eq("id", alert_id).execute()
-
-def atualizar_lead_score(email, pontos=5):
-    try:
-        supabase.rpc("increment_lead_score", {"p_email": email, "p_points": pontos}).execute()
-    except Exception:
-        lead = supabase.table("leads").select("id, lead_score").eq("email", email).single().execute()
-        if lead.data:
-            novo_score = (lead.data.get("lead_score") or 0) + pontos
-            supabase.table("leads").update({
-                "lead_score": novo_score,
-                "last_contact_at": datetime.utcnow().isoformat()
-            }).eq("email", email).execute()
-
-def enviar_email_alerta(to_email, perfume_nome, target_price, current_price, loja, store_url):
-    economia = round(target_price - current_price, 2)
-    if store_url and not store_url.startswith("http"):
-        store_url = f"{SITE_URL}{store_url}"
-
-    payload = {
-        "sender": {"name": FROM_NAME, "email": FROM_EMAIL},
-        "to": [{"email": to_email}],
-        "templateId": BREVO_TEMPLATE_ID,
-        "params": {
-            "perfume_nome": perfume_nome,
-            "target_price": f"{target_price:.2f}".replace(".", ","),
-            "current_price": f"{current_price:.2f}".replace(".", ","),
-            "economia": f"{economia:.2f}".replace(".", ","),
-            "loja": loja,
-            "store_url": store_url,
-            "site_url": SITE_URL
-        }
-    }
-
-    resp = requests.post(
+def enviar_email(to_email, perfume_nome, target_price, current_price):
+    r = requests.post(
         "https://api.brevo.com/v3/smtp/email",
-        json=payload,
-        headers={"api-key": BREVO_API_KEY, "Content-Type": "application/json"},
-        timeout=10
+        headers={"api-key": BREVO_KEY, "Content-Type": "application/json"},
+        json={
+            "to": [{"email": to_email}],
+            "templateId": TEMPLATE_ID,
+            "params": {
+                "perfume_nome": perfume_nome,
+                "current_price": f"{current_price:.2f}",
+                "target_price": f"{target_price:.2f}",
+                "loja": BASE_URL,
+            },
+            "sender": {"email": FROM_EMAIL, "name": FROM_NAME},
+        },
+        timeout=30,
     )
+    r.raise_for_status()
 
-    if resp.status_code in (200, 201):
-        log.info(f"  Email enviado para {to_email} ({perfume_nome})")
-        return True
-    else:
-        log.error(f"  Falha ao enviar para {to_email}: {resp.status_code} {resp.text}")
-        return False
 
 def run():
     log.info("=== ScentSearch Alert Checker — iniciando ===")
-    alertas = buscar_alertas_pendentes()
-    log.info(f"Alertas pendentes: {len(alertas)}")
+    alertas = buscar_alertas()
+    log.info(f"Alertas pendentes encontrados: {len(alertas)}")
 
-    notificados = sem_preco = preco_alto = erros = 0
+    notificados = preco_alto = sem_preco = erros = 0
 
-    for alerta in alertas:
-        perfume_id   = alerta["perfume_id"]
-        perfume_nome = alerta["perfume_nome"]
-        target_price = float(alerta["target_price"])
-        email        = alerta["email"]
-        alert_id     = alerta["id"]
+    for a in alertas:
+        nome = a["perfume_nome"]
+        target = float(a["target_price"])
+        current = a.get("current_min_price")
 
-        log.info(f"Verificando: {perfume_nome} | alvo R${target_price:.2f} | {email}")
+        log.info(
+            f"→ {nome} | alvo R${target:.2f} | atual {f'R${float(current):.2f}' if current else 'sem preço'}"
+        )
 
-        preco_info = buscar_menor_preco(perfume_id)
-        if not preco_info:
-            log.warning(f"  Sem preço disponível para {perfume_nome}")
+        if current is None:
             sem_preco += 1
             continue
 
-        current_price = float(preco_info["preco"])
-        loja          = preco_info["loja"]
-        store_url     = preco_info["link_afiliado"] or f"{SITE_URL}/perfume/{perfume_id}"
+        current = float(current)
 
-        log.info(f"  Menor preço: R${current_price:.2f} na {loja}")
-
-        if current_price > target_price:
-            log.info(f"  Preço acima do alvo (R${current_price:.2f} > R${target_price:.2f})")
+        if current > target:
+            log.info(f"  ○ Preço ainda acima do alvo")
             preco_alto += 1
             continue
 
-        sucesso = enviar_email_alerta(email, perfume_nome, target_price, current_price, loja, store_url)
-
-        if sucesso:
-            marcar_como_notificado(alert_id)
-            atualizar_lead_score(email, pontos=5)
+        try:
+            enviar_email(a["email"], nome, target, current)
+            marcar_notificado(a["id"], a["email"])
             notificados += 1
-        else:
+            log.info(f"  ✉ Email enviado para {a['email']}")
+        except Exception as e:
+            log.error(f"  ✗ Erro: {e}")
             erros += 1
 
-    log.info(f"=== Resumo: notificados={notificados} sem_preco={sem_preco} alto={preco_alto} erros={erros} ===")
+    log.info("=== Resumo ===")
+    log.info(f"  ✉  Notificados:        {notificados}")
+    log.info(f"  ○  Preço ainda alto:   {preco_alto}")
+    log.info(f"  ⚠  Sem preço no banco: {sem_preco}")
+    log.info(f"  ✗  Erros de envio:     {erros}")
+    log.info("=== Alert Checker concluído ===")
+
 
 if __name__ == "__main__":
     run()
